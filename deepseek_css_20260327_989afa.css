@@ -1,0 +1,106 @@
+/* style.css - Tebe Story Maker v15 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #c5a059 #1e1e1e;
+}
+
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: #1e1e1e;
+  border-radius: 10px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #c5a059;
+  border-radius: 10px;
+}
+
+body {
+  background-color: #0d0d0d;
+  font-family: 'Crimson Pro', serif;
+}
+
+.font-cinzel {
+  font-family: 'Cinzel', serif;
+}
+
+.font-crimson {
+  font-family: 'Crimson Pro', serif;
+}
+
+.sidebar {
+  background-color: #0a0a0a;
+  border-right: 1px solid #1f1f1f;
+}
+
+.chapter-card {
+  transition: all 0.2s ease;
+  border-left: 4px solid #c5a059;
+  background-color: #111111;
+}
+
+.chapter-card:hover {
+  background-color: #141414;
+}
+
+textarea, input, select {
+  background-color: #1a1a1a;
+  border: 1px solid #2c2c2c;
+  color: #ececec;
+  transition: 0.2s;
+}
+
+textarea:focus, input:focus, select:focus {
+  border-color: #c5a059;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(197, 160, 89, 0.3);
+}
+
+.btn-gold {
+  background-color: #c5a059;
+  color: #0d0d0d;
+  font-weight: 600;
+  transition: 0.2s;
+}
+
+.btn-gold:hover {
+  background-color: #d4af6e;
+  transform: translateY(-1px);
+}
+
+.btn-outline-gold {
+  border: 1px solid #c5a059;
+  color: #c5a059;
+  background: transparent;
+}
+
+.btn-outline-gold:hover {
+  background: rgba(197, 160, 89, 0.1);
+}
+
+/* styling untuk summary dan content agar ukuran font sama */
+.summary-textarea, .content-textarea {
+  font-size: 0.95rem;
+  line-height: 1.5;
+  font-family: 'Crimson Pro', monospace;
+}
+
+/* tampilan hasil ekspor HTML (kertas tua) */
+.paper-html {
+  background-color: #917e5d;
+  color: #2c2418;
+  line-height: 1.6;
+  font-family: 'Crimson Pro', serif;
+  padding: 2rem;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.paper-html p {
+  text-indent: 1.5em;
+  margin-bottom: 0.75em;
+}
