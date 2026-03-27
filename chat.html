@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Chatbot - OpenRouter</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .chat-container { height: calc(100vh - 200px); }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    </style>
+</head>
+<body class="bg-slate-50 flex flex-col h-screen">
+
+    <header class="bg-white shadow-sm p-4">
+        <div class="max-w-4xl mx-auto flex flex-wrap gap-3 items-center">
+            <h1 class="font-bold text-xl text-indigo-600 mr-4">Gemini-Router</h1>
+            <input type="password" id="apiKey" placeholder="Masukkan OpenRouter API Key" 
+                   class="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-indigo-500">
+            <button onclick="clearChat()" class="bg-red-100 text-red-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-200">
+                Hapus Chat
+            </button>
+        </div>
+    </header>
+
+    <main id="chatBox" class="max-w-4xl w-full mx-auto flex-1 overflow-y-auto p-4 space-y-4 chat-container">
+        </main>
+
+    <footer class="bg-white border-t p-4">
+        <div class="max-w-4xl mx-auto flex gap-2">
+            <textarea id="userInput" rows="1" placeholder="Tulis pesan..." 
+                      class="flex-1 border rounded-xl px-4 py-3 focus:outline-indigo-500 resize-none"></textarea>
+            <button id="sendBtn" onclick="sendMessage()" 
+                    class="bg-indigo-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-indigo-700 transition">
+                Kirim
+            </button>
+        </div>
+    </footer>
+
+    <script>
+        const chatBox = document.getElementById('chatBox');
+        const apiKeyInput = document.getElementById('apiKey');
+        const userInput = document.getElementById('userInput');
+
+        // 1. Load data dari LocalStorage saat buka halaman
+        window.onload = () => {
+            if(localStorage.getItem('openrouter_key')) {
+                apiKeyInput.value = localStorage.getItem('openrouter_key');
+            }
+            if(localStorage.getItem('chat_history')) {
+                chatBox.innerHTML = localStorage.getItem('chat_history');
+                scrollToBottom();
+            }
+        };
+
+        // Simpan API Key otomatis saat diketik
+        apiKeyInput.addEventListener('input', () => {
+            localStorage.setItem('openrouter_key', apiKeyInput.value);
+        });
+
+        async function sendMessage() {
+            const key = apiKeyInput.value;
+            const text = userInput.value.trim();
+
+            if (!key) return alert("Masukkan API Key terlebih dahulu!");
+            if (!text) return;
+
+            // Tambah pesan user ke UI
+            appendMessage('user', text);
+            userInput.value = '';
+            
+            // Loading state
+            const loadingId = appendMessage('bot', 'Sedang berpikir...');
+
+            try {
+                const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+                    method: "POST",
+                    headers: {
+                        "Authorization": `Bearer ${key}`,
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        "model": "google/gemini-2.0-flash-001", // Kamu bisa ganti modelnya di sini
+                        "messages": [{ "role": "user", "content": text }]
+                    })
+                });
+
+                const data = await response.json();
+                const aiResponse = data.choices[0].message.content;
+
+                // Update pesan bot (hapus loading)
+                document.getElementById(loadingId).remove();
+                appendMessage('bot', aiResponse);
+
+            } catch (error) {
+                document.getElementById(loadingId).innerText = "Error: Gagal menghubungi API.";
+                console.error(error);
+            }
+        }
+
+        function appendMessage(role, text) {
+            const id = 'msg-' + Date.now();
+            const isUser = role === 'user';
+            const html = `
+                <div id="${id}" class="flex ${isUser ? 'justify-end' : 'justify-start'}">
+                    <div class="max-w-[80%] p-3 rounded-2xl ${isUser ? 'bg-indigo-600 text-white' : 'bg-white border text-slate-800 shadow-sm'}">
+                        <p class="whitespace-pre-wrap text-sm">${text}</p>
+                    </div>
+                </div>
+            `;
+            chatBox.insertAdjacentHTML('beforeend', html);
+            saveChat();
+            scrollToBottom();
+            return id;
+        }
+
+        function saveChat() {
+            localStorage.setItem('chat_history', chatBox.innerHTML);
+        }
+
+        function clearChat() {
+            if(confirm("Hapus semua percakapan?")) {
+                chatBox.innerHTML = '';
+                localStorage.removeItem('chat_history');
+            }
+        }
+
+        function scrollToBottom() {
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        // Support Enter to send
+        userInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+</html>
