@@ -171,6 +171,11 @@ function loadPersistedData() {
     if (availableModels.length) {
       populateModelDropdown();
       if (selectedModel && availableModels.includes(selectedModel)) modelSelect.value = selectedModel;
+    } else {
+      // Fallback ke model umum jika tidak ada model tersimpan
+      availableModels = ['gemini-1.5-flash', 'gemini-1.5-pro'];
+      selectedModel = 'gemini-1.5-flash';
+      populateModelDropdown();
     }
     renderChapters();
   } catch(e) { console.warn(e); }
@@ -294,10 +299,20 @@ function exportFullHtmlFunc() {
 async function fetchGeminiModels(apiKey) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
   const res = await fetch(url);
-  if (!res.ok) throw new Error("Gagal mengambil model");
+  if (!res.ok) {
+    const error = await res.text();
+    throw new Error(`HTTP ${res.status}: ${error}`);
+  }
   const data = await res.json();
-  const models = data.models.filter(m => m.name.includes("gemini") && m.supportedGenerationMethods?.includes("streamGenerateContent")).map(m => m.name.split("/").pop());
-  return models;
+  // Ambil semua model yang namanya mengandung "gemini" (case-insensitive)
+  let models = data.models.filter(m => m.name.toLowerCase().includes("gemini"));
+  // Prioritaskan yang mendukung streamGenerateContent jika ada
+  const streamingModels = models.filter(m => m.supportedGenerationMethods?.includes("streamGenerateContent"));
+  if (streamingModels.length > 0) {
+    models = streamingModels;
+  }
+  // Ekstrak nama model dari format "models/gemini-1.5-pro"
+  return models.map(m => m.name.split('/').pop());
 }
 
 function populateModelDropdown() {
@@ -317,14 +332,26 @@ connectBtn.addEventListener("click", async () => {
     connectBtn.disabled = true;
     connectBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Memuat model...';
     const models = await fetchGeminiModels(key);
-    currentApiKey = key;
-    availableModels = models;
-    populateModelDropdown();
-    if (models.length) selectedModel = models[0];
-    modelSelect.value = selectedModel;
-    persistData();
-    alert(`Berhasil! ${models.length} model ditemukan.`);
+    if (models.length === 0) {
+      // Fallback ke model default jika tidak ada model yang terdeteksi
+      alert("Tidak ada model Gemini ditemukan. Menggunakan model default (gemini-1.5-flash). Pastikan API Key valid dan akun Anda memiliki akses ke Gemini API.");
+      availableModels = ['gemini-1.5-flash', 'gemini-1.5-pro'];
+      selectedModel = 'gemini-1.5-flash';
+      populateModelDropdown();
+      modelSelect.value = selectedModel;
+      currentApiKey = key;
+      persistData();
+    } else {
+      currentApiKey = key;
+      availableModels = models;
+      populateModelDropdown();
+      selectedModel = models[0];
+      modelSelect.value = selectedModel;
+      persistData();
+      alert(`Berhasil! ${models.length} model ditemukan: ${models.join(', ')}`);
+    }
   } catch(err) {
+    console.error(err);
     alert("Error: " + err.message);
   } finally {
     connectBtn.disabled = false;
