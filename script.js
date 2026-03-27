@@ -1,13 +1,13 @@
 // ======================== TEBE STORY MAKER v15 ========================
-// fitur: streaming, memory continuity, auto-save, export, clean text, block_none
+// Perbaikan deteksi model & fallback manual
 
 // State utama
-let chapters = [];           // array of { id, title, summary, content, timestamp }
+let chapters = [];
 let currentApiKey = "";
 let availableModels = [];
 let selectedModel = "";
 let novelConcept = { title: "", genre: "", style: "", idea: "" };
-let isGenerating = false;    // mencegah double generate
+let isGenerating = false;
 
 // DOM Elements
 const apiKeyInput = document.getElementById("apiKeyInput");
@@ -19,26 +19,20 @@ const chapterCountBadge = document.getElementById("chapterCountBadge");
 const exportFullTxt = document.getElementById("exportFullTxtBtn");
 const exportFullHtml = document.getElementById("exportFullHtmlBtn");
 
-// Input konsep
 const novelTitleInput = document.getElementById("novelTitle");
 const novelGenreInput = document.getElementById("novelGenre");
 const novelStyleInput = document.getElementById("novelStyle");
 const novelIdeaInput = document.getElementById("novelIdea");
 
 // ======================== UTILITIES ========================
-// Bersihkan teks dari sapaan AI dan karakter escape JSON
 function cleanRawText(raw) {
   if (!raw) return "";
-  // hapus berbagai sapaan umum yang sering muncul
   let cleaned = raw.replace(/^(Berikut (adalah )?ceritanya[:]?|Inilah (cerita|narasi)nya[:]?|Tentu,? (berikut|ini) (cerita|narasi)nya[:]?|Baiklah,? (berikut|ini) (cerita|narasi)nya[:]?|Sebagai AI,? )\s*/i, "");
   cleaned = cleaned.replace(/^\s*["']?(Cerita|Narasi|Bab)\s*\d*[:]\s*/i, "");
-  // unescape karakter JSON (jika ada)
   cleaned = cleaned.replace(/\\n/g, "\n").replace(/\\"/g, '"').replace(/\\\//g, "/").replace(/\\\\/g, "\\");
-  // bersihkan spasi berlebih di awal
   return cleaned.trim();
 }
 
-// Buat ringkasan dari semua bab sebelumnya (untuk memory continuity)
 function buildContextSummary() {
   if (chapters.length === 0) return "Belum ada bab sebelumnya.";
   let summary = "RINGKASAN CERITA SEBELUMNYA:\n";
@@ -48,7 +42,6 @@ function buildContextSummary() {
   return summary;
 }
 
-// Membangun prompt untuk bab baru
 function buildNewChapterPrompt() {
   const concept = novelConcept;
   const context = buildContextSummary();
@@ -62,9 +55,10 @@ function buildNewChapterPrompt() {
   return prompt;
 }
 
-// Stream generate dengan Gemini API (support streaming)
 async function streamGenerateChapter(prompt, apiKey, modelName) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:streamGenerateContent?key=${apiKey}`;
+  // Pastikan modelName tidak mengandung "models/" lagi
+  const cleanModel = modelName.replace(/^models\//, '');
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${cleanModel}:streamGenerateContent?key=${apiKey}`;
   const requestBody = {
     contents: [{ parts: [{ text: prompt }] }],
     generationConfig: { temperature: 0.9, maxOutputTokens: 2048 },
@@ -105,10 +99,7 @@ async function streamGenerateChapter(prompt, apiKey, modelName) {
         try {
           const parsed = JSON.parse(jsonStr);
           const chunk = parsed.candidates?.[0]?.content?.parts?.[0]?.text || "";
-          if (chunk) {
-            fullText += chunk;
-            // update streaming ke card sementara (callback akan di-handle oleh caller)
-          }
+          if (chunk) fullText += chunk;
         } catch (e) { /* abaikan */ }
       }
     }
@@ -116,43 +107,31 @@ async function streamGenerateChapter(prompt, apiKey, modelName) {
   return fullText;
 }
 
-// Pisahkan judul dan isi dari output AI
 function parseChapterContent(raw) {
   let cleaned = cleanRawText(raw);
   let title = "Bab Baru";
   let content = cleaned;
 
-  // cari pola JUDUL: ... atau Bab X: ...
   const titleMatch = cleaned.match(/^(?:JUDUL\s*:?\s*|Bab\s*\d+\s*:?\s*)(.+?)(?:\n|$)/i);
   if (titleMatch) {
     title = titleMatch[1].trim();
     content = cleaned.replace(titleMatch[0], "").trim();
   } else {
-    // jika tidak ada judul eksplisit, ambil baris pertama sebagai judul
     const firstLineEnd = cleaned.indexOf("\n");
     if (firstLineEnd > 0 && firstLineEnd < 80) {
       title = cleaned.substring(0, firstLineEnd).trim();
       content = cleaned.substring(firstLineEnd).trim();
     }
   }
-  // batasi judul terlalu panjang
   if (title.length > 80) title = title.substring(0, 80);
   return { title, content };
 }
 
-// Simpan state ke localStorage
 function persistData() {
-  const data = {
-    chapters,
-    novelConcept,
-    currentApiKey,
-    selectedModel,
-    availableModels
-  };
+  const data = { chapters, novelConcept, currentApiKey, selectedModel, availableModels };
   localStorage.setItem("tebeStoryMaker", JSON.stringify(data));
 }
 
-// Muat data dari localStorage
 function loadPersistedData() {
   const saved = localStorage.getItem("tebeStoryMaker");
   if (!saved) return;
@@ -172,7 +151,7 @@ function loadPersistedData() {
       populateModelDropdown();
       if (selectedModel && availableModels.includes(selectedModel)) modelSelect.value = selectedModel;
     } else {
-      // Fallback ke model umum jika tidak ada model tersimpan
+      // Fallback model default jika tidak ada
       availableModels = ['gemini-1.5-flash', 'gemini-1.5-pro'];
       selectedModel = 'gemini-1.5-flash';
       populateModelDropdown();
@@ -181,7 +160,6 @@ function loadPersistedData() {
   } catch(e) { console.warn(e); }
 }
 
-// Render semua chapter cards
 function renderChapters() {
   if (!chaptersContainer) return;
   if (chapters.length === 0) {
@@ -214,7 +192,6 @@ function renderChapters() {
   });
   chaptersContainer.innerHTML = html;
 
-  // attach event listeners untuk textarea auto-save
   document.querySelectorAll(".summary-textarea, .content-textarea").forEach(ta => {
     ta.addEventListener("change", function() {
       const idx = parseInt(this.dataset.idx);
@@ -222,12 +199,11 @@ function renderChapters() {
       if (!isNaN(idx) && chapters[idx]) {
         chapters[idx][field] = this.value;
         persistData();
-        renderChapters(); // re-render untuk menjaga konsistensi (opsional tapi aman)
+        renderChapters();
       }
     });
   });
 
-  // export per bab
   document.querySelectorAll(".export-chapter-txt").forEach(btn => {
     btn.addEventListener("click", (e) => {
       const idx = parseInt(btn.dataset.idx);
@@ -249,8 +225,6 @@ function escapeHtml(str) {
     if (m === '<') return '&lt;';
     if (m === '>') return '&gt;';
     return m;
-  }).replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, function(c) {
-    return c;
   });
 }
 
@@ -275,7 +249,6 @@ function downloadFile(filename, content, mime) {
   URL.revokeObjectURL(link.href);
 }
 
-// Ekspor full novel TXT
 function exportFullTxtFunc() {
   let full = `NOVEL: ${novelConcept.title || "Tanpa Judul"}\nGenre: ${novelConcept.genre || "-"}\n\n`;
   chapters.forEach((ch, i) => {
@@ -284,7 +257,6 @@ function exportFullTxtFunc() {
   downloadFile(`${novelConcept.title || "novel"}_full.txt`, full, "text/plain");
 }
 
-// Ekspor full novel HTML (kertas tua)
 function exportFullHtmlFunc() {
   let bodyContent = `<div class="paper-html"><h1>${escapeHtml(novelConcept.title || "Novel")}</h1><p><em>Genre: ${escapeHtml(novelConcept.genre || "-")}</em></p>`;
   chapters.forEach((ch, i) => {
@@ -304,15 +276,23 @@ async function fetchGeminiModels(apiKey) {
     throw new Error(`HTTP ${res.status}: ${error}`);
   }
   const data = await res.json();
-  // Ambil semua model yang namanya mengandung "gemini" (case-insensitive)
-  let models = data.models.filter(m => m.name.toLowerCase().includes("gemini"));
-  // Prioritaskan yang mendukung streamGenerateContent jika ada
-  const streamingModels = models.filter(m => m.supportedGenerationMethods?.includes("streamGenerateContent"));
-  if (streamingModels.length > 0) {
-    models = streamingModels;
+  console.log("Raw models response:", data); // Debugging
+  
+  // Ambil semua model yang namanya mengandung "gemini" dan mendukung generateContent
+  let models = data.models.filter(m => 
+    m.name.toLowerCase().includes("gemini") && 
+    (m.supportedGenerationMethods?.includes("generateContent") || m.supportedGenerationMethods?.includes("streamGenerateContent"))
+  );
+  
+  // Jika tidak ada, ambil semua model yang mengandung "gemini" tanpa syarat
+  if (models.length === 0) {
+    models = data.models.filter(m => m.name.toLowerCase().includes("gemini"));
   }
-  // Ekstrak nama model dari format "models/gemini-1.5-pro"
-  return models.map(m => m.name.split('/').pop());
+  
+  // Ekstrak nama model (hilangkan "models/")
+  const modelNames = models.map(m => m.name.split('/').pop());
+  console.log("Model names found:", modelNames);
+  return modelNames;
 }
 
 function populateModelDropdown() {
@@ -323,6 +303,11 @@ function populateModelDropdown() {
     opt.textContent = m;
     modelSelect.appendChild(opt);
   });
+  // Tambahkan opsi input manual jika diperlukan
+  const manualOption = document.createElement("option");
+  manualOption.value = "__manual__";
+  manualOption.textContent = "✏️ Input manual...";
+  modelSelect.appendChild(manualOption);
 }
 
 connectBtn.addEventListener("click", async () => {
@@ -333,12 +318,10 @@ connectBtn.addEventListener("click", async () => {
     connectBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Memuat model...';
     const models = await fetchGeminiModels(key);
     if (models.length === 0) {
-      // Fallback ke model default jika tidak ada model yang terdeteksi
-      alert("Tidak ada model Gemini ditemukan. Menggunakan model default (gemini-1.5-flash). Pastikan API Key valid dan akun Anda memiliki akses ke Gemini API.");
-      availableModels = ['gemini-1.5-flash', 'gemini-1.5-pro'];
-      selectedModel = 'gemini-1.5-flash';
+      // Tidak ada model ditemukan: tawarkan input manual
+      alert("Tidak ada model Gemini ditemukan secara otomatis. Anda dapat memasukkan nama model secara manual dari dropdown (pilih 'Input manual...'). Pastikan API Key valid.");
+      availableModels = [];
       populateModelDropdown();
-      modelSelect.value = selectedModel;
       currentApiKey = key;
       persistData();
     } else {
@@ -360,15 +343,33 @@ connectBtn.addEventListener("click", async () => {
 });
 
 modelSelect.addEventListener("change", () => {
-  selectedModel = modelSelect.value;
-  persistData();
+  if (modelSelect.value === "__manual__") {
+    const manualModel = prompt("Masukkan nama model Gemini (contoh: gemini-1.5-flash, gemini-1.5-pro):", "gemini-1.5-flash");
+    if (manualModel && manualModel.trim()) {
+      const newModel = manualModel.trim();
+      if (!availableModels.includes(newModel)) {
+        availableModels.push(newModel);
+        populateModelDropdown();
+      }
+      selectedModel = newModel;
+      modelSelect.value = newModel;
+      persistData();
+    } else {
+      // Kembalikan ke model yang sebelumnya dipilih
+      if (selectedModel) modelSelect.value = selectedModel;
+      else modelSelect.value = "";
+    }
+  } else {
+    selectedModel = modelSelect.value;
+    persistData();
+  }
 });
 
-// ======================== GENERATE BAB BARU (STREAMING) ========================
+// ======================== GENERATE BAB BARU ========================
 newChapterBtn.addEventListener("click", async () => {
   if (isGenerating) { alert("Sedang membuat bab, harap tunggu..."); return; }
   if (!currentApiKey || !selectedModel) { alert("Hubungkan API Key dan pilih model terlebih dahulu."); return; }
-  // update konsep dari input
+  
   novelConcept = {
     title: novelTitleInput.value,
     genre: novelGenreInput.value,
@@ -376,6 +377,7 @@ newChapterBtn.addEventListener("click", async () => {
     idea: novelIdeaInput.value
   };
   persistData();
+  
   const prompt = buildNewChapterPrompt();
   isGenerating = true;
   newChapterBtn.disabled = true;
@@ -394,7 +396,6 @@ newChapterBtn.addEventListener("click", async () => {
     chapters.push(newChapter);
     renderChapters();
     persistData();
-    // scroll ke bab terbaru
     setTimeout(() => {
       const cards = document.querySelectorAll(".chapter-card");
       if (cards.length) cards[cards.length-1].scrollIntoView({ behavior: "smooth" });
@@ -409,11 +410,11 @@ newChapterBtn.addEventListener("click", async () => {
   }
 });
 
-// Ekspor full
+// Event listeners ekspor
 exportFullTxt.addEventListener("click", exportFullTxtFunc);
 exportFullHtml.addEventListener("click", exportFullHtmlFunc);
 
-// Auto-save konsep saat input berubah
+// Auto-save konsep
 const conceptInputs = [novelTitleInput, novelGenreInput, novelStyleInput, novelIdeaInput];
 conceptInputs.forEach(inp => {
   inp.addEventListener("input", () => {
@@ -427,6 +428,6 @@ conceptInputs.forEach(inp => {
   });
 });
 
-// Initial load
+// Inisialisasi
 loadPersistedData();
 renderChapters();
