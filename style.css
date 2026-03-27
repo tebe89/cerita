@@ -4,7 +4,6 @@ body { background-color: #0d0d0d; color: #e0e0e0; font-family: 'Inter', sans-ser
 .gold-text { color: #c5a059; font-family: 'Cinzel', serif; }
 .gold-bg { background-color: #c5a059; color: #121212; }
 .input-dark { background-color: #1a1a1a; border: 1px solid #333; color: #fff; border-radius: 6px; font-size: 0.8rem; outline: none; }
-.novel-font { font-family: 'Crimson Pro', serif; }
 
 .sidebar { background-color: #121212; border-right: 1px solid #333; width: 320px; height: 100vh; overflow-y: auto; flex-shrink: 0; padding: 20px; }
 .main-content { flex: 1; height: 100vh; overflow-y: auto; background-color: #080808; }
@@ -23,5 +22,4 @@ body { background-color: #0d0d0d; color: #e0e0e0; font-family: 'Inter', sans-ser
     display: inline-block; animation: rotation 1s linear infinite;
 }
 @keyframes rotation { 0% { transform: rotate(0deg) } 100% { transform: rotate(360deg) } }
-
 .sidebar-footer-spacer { height: 180px; }
