@@ -9,26 +9,27 @@
 </head>
 <body class="flex flex-col md:flex-row min-h-screen">
 
-    <div id="aiPopup" class="hidden fixed inset-0 bg-black/95 z-[999] flex items-center justify-center">
-        <div class="bg-[#111] border-2 border-[#c5a059] p-8 rounded-[2rem] text-center max-w-xs w-full shadow-2xl">
-            <div class="loader mb-4 mx-auto"></div>
-            <h3 class="gold-text font-bold text-lg" id="popupStatus">Menghubungkan...</h3>
+    <div id="aiPopup" class="hidden fixed inset-0 z-[999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div class="bg-[#1a1a1a] border border-gray-800 p-6 rounded-2xl text-center shadow-2xl max-w-[280px] w-full">
+            <div class="loader mb-3 mx-auto"></div>
+            <h3 class="text-white font-bold text-sm novel-font" id="popupStatus">Memproses...</h3>
+            <div id="popupTimer" class="text-yellow-500 text-lg font-black my-1">0s</div>
+            <div id="engineStatus" class="text-green-500 text-[10px] font-bold">Engine: Normal</div>
+            <button onclick="cancelProcess()" class="mt-4 text-[10px] text-red-500 border border-red-900/50 px-4 py-1 rounded-full hover:bg-red-950/30 transition">CANCEL PROCESS</button>
         </div>
     </div>
 
     <div class="sidebar">
         <div class="space-y-6">
             <h1 class="text-xl font-bold gold-text border-b border-gray-800 pb-2">Studio Novel v15</h1>
-            
             <div class="space-y-3">
                 <span class="text-[10px] font-black text-gray-500 uppercase flex justify-between">🔑 API KEY <span id="savedTag" class="hidden text-green-600 font-bold uppercase">Saved</span></span>
                 <input type="password" id="apiKey" placeholder="Gemini API Key..." class="w-full p-2 input-dark border-yellow-900/20">
                 <button type="button" id="btnCheck" class="w-full py-2 gold-bg text-xs font-bold rounded">HUBUNGKAN ENGINE</button>
                 <div id="engineWrapper" class="hidden">
-                    <select id="modelSelect" class="w-full p-2 input-dark text-yellow-500 font-bold"></select>
+                    <select id="modelSelect" class="w-full p-2 input-dark text-yellow-500 font-bold border-yellow-900/30"></select>
                 </div>
             </div>
-
             <div class="space-y-2">
                 <span class="text-[10px] font-black text-gray-500 uppercase">1. Konsep</span>
                 <input type="text" id="novelTitle" placeholder="Judul Novel" class="w-full p-2 input-dark">
@@ -38,19 +39,17 @@
                 </div>
                 <textarea id="storyIdea" rows="3" placeholder="Ide Utama..." class="w-full p-2 input-dark"></textarea>
             </div>
-
             <div class="space-y-2">
                 <span class="text-[10px] font-black text-gray-500 uppercase">2. Struktur</span>
                 <input type="number" id="chapterCount" value="3" class="w-full p-2 input-dark text-center gold-text font-bold">
                 <button type="button" id="btnPlan" class="w-full py-3 bg-blue-900 text-white text-[10px] font-bold rounded-lg border border-blue-500 shadow-xl">RANCANG ALUR</button>
             </div>
-
             <div class="space-y-3 pt-4 border-t border-gray-800">
                 <div class="grid grid-cols-2 gap-2">
-                    <button id="btnFullTxt" class="py-2 bg-gray-800 text-[10px] font-bold rounded border border-gray-700">FULL .TXT</button>
-                    <button id="btnFullHtml" class="py-2 border border-[#c5a059] gold-text text-[10px] font-bold rounded">FULL .HTML</button>
+                    <button onclick="downloadFull('txt')" class="py-2 bg-gray-800 text-[10px] font-bold rounded border border-gray-700 hover:text-white">FULL .TXT</button>
+                    <button onclick="downloadFull('html')" class="py-2 border border-[#c5a059] gold-text text-[10px] font-bold rounded hover:bg-[#c5a059]/10">FULL .HTML</button>
                 </div>
-                <button id="btnClear" class="w-full py-1 text-[8px] text-red-900 uppercase font-bold tracking-widest mt-2">Hapus Draf</button>
+                <button onclick="clearAllData()" class="w-full py-1 text-[8px] text-red-900 uppercase font-bold tracking-widest mt-2">Hapus Draf</button>
             </div>
             <div class="sidebar-footer-spacer"></div>
         </div>
@@ -60,7 +59,7 @@
         <div id="mainPlaceholder" class="h-full flex flex-col items-center justify-center text-center">
             <div class="p-10 border border-gray-900 rounded-[2.5rem] max-w-lg w-full bg-[#111]/30">
                 <h2 class="text-4xl font-bold gold-text mb-4 novel-font">The Ghostwriter</h2>
-                <p class="text-gray-400 text-sm italic">"Salin, Unduh, Jalankan. EYD & Tanda Baca diperbaiki."</p>
+                <p class="text-gray-400 text-sm italic">"Mode Stabil v15: Klik Hubungkan Engine untuk memulai."</p>
             </div>
         </div>
         <div id="novelWorkspace" class="hidden space-y-10 max-w-4xl mx-auto">
@@ -74,5 +73,4 @@
 
     <script src="script.js"></script>
 </body>
-</html>
 </html>
