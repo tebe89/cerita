@@ -1,14 +1,39 @@
-// Memastikan semua elemen siap sebelum skrip berjalan
 document.addEventListener('DOMContentLoaded', () => {
-    
     const getEl = id => document.getElementById(id);
+    let timerInterval;
+    let abortController; // Untuk fitur Cancel
 
-    // --- SISTEM POPUP ---
+    // --- SISTEM POPUP UPGRADED ---
     function showPopup(msg) {
+        // Reset timer
+        let seconds = 0;
+        getEl('popupTimer').innerText = "0s";
+        clearInterval(timerInterval);
+        
+        timerInterval = setInterval(() => {
+            seconds++;
+            getEl('popupTimer').innerText = seconds + "s";
+        }, 1000);
+
         getEl('aiPopup').classList.remove('hidden');
         getEl('popupStatus').innerText = msg;
+        getEl('engineStatus').innerText = "Engine: Memproses Normal...";
+        getEl('engineStatus').className = "text-green-500 text-[10px] mt-1 font-bold";
     }
-    function hidePopup() { getEl('aiPopup').classList.add('hidden'); }
+
+    function hidePopup() {
+        getEl('aiPopup').classList.add('hidden');
+        clearInterval(timerInterval);
+    }
+
+    // Fungsi Cancel
+    window.cancelProcess = function() {
+        if (abortController) {
+            abortController.abort();
+            hidePopup();
+            alert("Proses dibatalkan oleh pengguna.");
+        }
+    }
 
     // --- SISTEM PENYIMPANAN ---
     function saveDraft() {
@@ -53,17 +78,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 getEl('engineWrapper').classList.remove('hidden');
                 getEl('btnCheck').innerText = "ENGINE READY ✓";
-                getEl('btnCheck').style.backgroundColor = "#064e3b"; // Hijau tua
+                getEl('btnCheck').style.backgroundColor = "#064e3b"; 
                 getEl('btnCheck').style.color = "white";
-                console.log("Koneksi Berhasil");
-            } else if (data.error) {
-                alert("API Error: " + data.error.message);
+            } else {
+                throw new Error(data.error?.message || "Kunci tidak valid");
             }
         } catch (e) {
-            alert("Gagal terhubung. Pastikan internet aktif atau coba gunakan browser Chrome/Edge terbaru.");
-            console.error(e);
+            getEl('engineStatus').innerText = "Engine: Terjadi Gangguan!";
+            getEl('engineStatus').className = "text-red-500 text-[10px] mt-1 font-bold";
+            alert("Gagal: " + e.message);
         } finally {
-            hidePopup();
+            setTimeout(hidePopup, 1000);
         }
     }
 
@@ -71,47 +96,60 @@ document.addEventListener('DOMContentLoaded', () => {
     async function callAI(prompt) {
         const key = getEl('apiKey').value;
         const model = getEl('modelSelect').value;
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/${model}:generateContent?key=${key}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: { temperature: 0.8, topP: 0.95 }
-            })
-        });
-        const data = await res.json();
-        if (!data.candidates) throw new Error("AI tidak merespon");
-        return data.candidates[0].content.parts[0].text.trim();
+        
+        abortController = new AbortController(); // Inisialisasi controller untuk cancel
+
+        try {
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/${model}:generateContent?key=${key}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                signal: abortController.signal,
+                body: JSON.stringify({ 
+                    contents: [{ parts: [{ text: prompt }] }],
+                    generationConfig: { temperature: 0.8, topP: 0.95 }
+                })
+            });
+            const data = await res.json();
+            if (!data.candidates) throw new Error("AI tidak merespon / Limit API tercapai");
+            return data.candidates[0].content.parts[0].text.trim();
+        } catch (e) {
+            if (e.name === 'AbortError') throw new Error("Dibatalkan");
+            getEl('engineStatus').innerText = "Engine: Gagal merespon!";
+            getEl('engineStatus').className = "text-red-500 text-[10px] mt-1 font-bold";
+            throw e;
+        }
     }
 
     async function planNovel() {
         const idea = getEl('storyIdea').value;
         if(!idea) return alert("Isi ide utamanya dulu, Tamroni.");
         showPopup("Merancang Alur...");
-        const prompt = `Buat alur novel dalam JSON murni (tanpa kata pembuka): [{"label":"Bab 1","judul":"...","ringkasan":"..."}]. Ide: ${idea}`;
+        const prompt = `Buat alur novel dalam JSON murni: [{"label":"Bab 1","judul":"...","ringkasan":"..."}]. Ide: ${idea}`;
         try {
             const raw = await callAI(prompt);
             const jsonPart = raw.substring(raw.indexOf('['), raw.lastIndexOf(']') + 1);
             renderWorkspace(JSON.parse(jsonPart), getEl('novelTitle').value);
             saveDraft();
-        } catch (e) { alert("Gagal merancang alur."); }
-        finally { hidePopup(); }
+        } catch (e) { 
+            if(e.message !== "Dibatalkan") alert("Gagal: " + e.message); 
+        } finally { hidePopup(); }
     }
 
     window.writeChapter = async function(i) {
-        showPopup(`Sedang Menulis Bab ${i+1}...`);
+        showPopup(`Menulis Bab ${i+1}...`);
         const titles = document.querySelectorAll('.ch-title-input');
         const summaries = document.querySelectorAll('.ch-summary-input');
         const prompt = `Tulis Bab Novel: ${titles[i].value}. Alur: ${summaries[i].value}. 
         Gaya: ${getEl('style').value}. Genre: ${getEl('genre').value}.
-        PENTING: Gunakan bahasa Indonesia yang rapi, pakai koma (,) dan titik (.) dengan benar, pastikan ada spasi antar kata. Minimal 1500 kata.`;
+        PENTING: Gunakan bahasa Indonesia yang rapi, pakai koma dan titik yang benar. Minimal 1500 kata.`;
         
         try {
             const res = await callAI(prompt);
             document.querySelectorAll('.ch-content-input')[i].value = res;
             saveDraft();
-        } catch (e) { alert("Gagal menulis bab."); }
-        finally { hidePopup(); }
+        } catch (e) { 
+            if(e.message !== "Dibatalkan") alert("Gagal: " + e.message);
+        } finally { hidePopup(); }
     };
 
     function renderWorkspace(plan, title) {
@@ -133,14 +171,13 @@ document.addEventListener('DOMContentLoaded', () => {
         `).join('');
     }
 
-    // --- PENGIKAT TOMBOL ---
     getEl('btnCheck').addEventListener('click', checkAndSaveApi);
     getEl('btnPlan').addEventListener('click', planNovel);
     
-    // Auto Load Key
+    // Auto Load
     const savedKey = localStorage.getItem('tebe_key_v15');
     if (savedKey) {
         getEl('apiKey').value = savedKey;
-        checkAndSaveApi();
+        setTimeout(() => getEl('btnCheck').click(), 500);
     }
 });
