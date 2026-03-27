@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TEBE STORY MAKER v15 - Final Fix</title>
+    <title>TEBE STORY MAKER v15 - Final Master</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="style.css">
 </head>
 <body class="flex flex-col md:flex-row min-h-screen">
 
-    <div id="aiPopup" class="hidden fixed inset-0 z-[999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+    <div id="aiPopup" class="hidden fixed inset-0 z-[999] flex items-center justify-center bg-black/40 backdrop-blur-sm">
         <div class="bg-[#1a1a1a] border border-gray-800 p-6 rounded-2xl text-center shadow-2xl max-w-[280px] w-full">
             <div class="loader mb-3 mx-auto"></div>
             <h3 class="text-white font-bold text-sm" id="popupStatus">Memproses...</h3>
@@ -44,7 +44,7 @@
 
             <div class="space-y-2">
                 <span class="text-[10px] font-black text-gray-500 uppercase">2. Struktur</span>
-                <input type="number" id="chapterCount" value="3" class="w-full p-2 input-dark text-center gold-text font-bold">
+                <input type="number" id="chapterCount" value="10" class="w-full p-2 input-dark text-center gold-text font-bold">
                 <button type="button" onclick="window.planNovel()" class="w-full py-3 bg-blue-900 text-white text-[10px] font-bold rounded-lg border border-blue-500 shadow-xl">RANCANG ALUR</button>
             </div>
 
@@ -63,7 +63,7 @@
         <div id="mainPlaceholder" class="h-full flex flex-col items-center justify-center text-center">
             <div class="p-10 border border-gray-900 rounded-[2.5rem] max-w-lg w-full bg-[#111]/30">
                 <h2 class="text-4xl font-bold gold-text mb-4">The Ghostwriter</h2>
-                <p class="text-gray-400 text-sm italic">"Pastikan API Key terhubung."</p>
+                <p class="text-gray-400 text-sm italic">"Prolog & Epilog Otomatis Aktif."</p>
             </div>
         </div>
         <div id="novelWorkspace" class="hidden space-y-10 max-w-4xl mx-auto">
