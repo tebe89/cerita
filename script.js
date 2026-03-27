@@ -3,7 +3,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let timerInterval;
     let abortController;
 
-    // --- POPUP ---
+    // --- POPUP SYSTEM ---
     function showPopup(msg) {
         let seconds = 0;
         getEl('popupTimer').innerText = "0s";
@@ -31,24 +31,29 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // --- STORAGE ---
+    // --- STORAGE SYSTEM ---
     window.saveDraft = () => {
+        const workspaceVisible = !getEl('novelWorkspace').classList.contains('hidden');
+        const chapters = [];
+        if (workspaceVisible) {
+            document.querySelectorAll('.chapter-card').forEach((card) => {
+                chapters.push({
+                    label: card.querySelector('.ch-label').innerText,
+                    judul: card.querySelector('.ch-title-input').value,
+                    summary: card.querySelector('.ch-summary-input').value,
+                    content: card.querySelector('.ch-content-input').value
+                });
+            });
+        }
+        
         const data = {
             title: getEl('novelTitle').value,
             genre: getEl('genre').value,
             style: getEl('style').value,
             idea: getEl('storyIdea').value,
-            workspaceVisible: !getEl('novelWorkspace').classList.contains('hidden'),
-            chapters: []
+            workspaceVisible: workspaceVisible,
+            chapters: chapters
         };
-        document.querySelectorAll('.chapter-card').forEach((card) => {
-            data.chapters.push({
-                label: card.querySelector('.ch-label').innerText,
-                judul: card.querySelector('.ch-title-input').value,
-                summary: card.querySelector('.ch-summary-input').value,
-                content: card.querySelector('.ch-content-input').value
-            });
-        });
         localStorage.setItem('tebe_v15_final', JSON.stringify(data));
     };
 
@@ -56,14 +61,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const saved = localStorage.getItem('tebe_v15_final');
         if (!saved) return;
         const data = JSON.parse(saved);
-        getEl('novelTitle').value = data.title;
-        getEl('genre').value = data.genre;
-        getEl('style').value = data.style;
-        getEl('storyIdea').value = data.idea;
-        if (data.workspaceVisible) renderWorkspace(data.chapters, data.title);
+        getEl('novelTitle').value = data.title || "";
+        getEl('genre').value = data.genre || "";
+        getEl('style').value = data.style || "";
+        getEl('storyIdea').value = data.idea || "";
+        if (data.workspaceVisible && data.chapters.length > 0) {
+            renderWorkspace(data.chapters, data.title);
+        }
     }
 
-    // --- API CORE ---
+    // --- API CONNECTION ---
     async function checkAndSaveApi() {
         const key = getEl('apiKey').value.trim();
         if(!key) return;
@@ -79,63 +86,64 @@ document.addEventListener('DOMContentLoaded', () => {
                 getEl('btnCheck').innerText = "ENGINE READY ✓";
                 getEl('btnCheck').style.backgroundColor = "#064e3b";
             }
-        } catch (e) { console.error("Koneksi gagal."); }
+        } catch (e) { console.error("Gagal koneksi API."); }
     }
 
     async function callAI(prompt) {
         const key = getEl('apiKey').value;
         const model = getEl('modelSelect').value;
+        if(!key || !model) throw new Error("API belum siap.");
+        
         abortController = new AbortController();
         const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/${model}:generateContent?key=${key}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             signal: abortController.signal,
-            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.85, maxOutputTokens: 8192 } })
+            body: JSON.stringify({ 
+                contents: [{ parts: [{ text: prompt }] }], 
+                generationConfig: { temperature: 0.85, maxOutputTokens: 8192 } 
+            })
         });
         const data = await res.json();
-        if (!data.candidates) throw new Error("Gagal.");
+        if (!data.candidates) throw new Error("AI Sibuk.");
         let text = data.candidates[0].content.parts[0].text;
-        // Bersihkan sapaan AI
         return text.replace(/^.*?(Berikut|Tentu|Halo|Baiklah).*?(\n|:)/gi, '').trim();
     }
 
-    window.planNovel = async () => {
+    // --- TOMBOL RANCANG ALUR ---
+    async function planNovelAction() {
         const idea = getEl('storyIdea').value;
-        if(!idea) return alert("Isi Ide!");
-        showPopup("Merancang Alur...");
+        if(!idea) return alert("Isi Ide dulu, Tamroni.");
+        
+        showPopup("Merancang Alur Novel...");
         try {
-            const raw = await callAI(`Bertindaklah sebagai arsitek alur. Buat alur novel dalam format JSON murni: [{"label":"Bab 1","judul":"...","ringkasan":"..."}]. Pastikan alur logis. Ide: ${idea}`);
+            const count = getEl('chapterCount').value || 3;
+            const prompt = `Bertindak sebagai arsitek alur. Buat alur novel dalam format JSON murni: [{"label":"Bab 1","judul":"...","ringkasan":"..."}]. Buat sebanyak ${count} bab termasuk Prolog & Epilog. Ide: ${idea}`;
+            const raw = await callAI(prompt);
             const jsonPart = raw.substring(raw.indexOf('['), raw.lastIndexOf(']') + 1);
             renderWorkspace(JSON.parse(jsonPart), getEl('novelTitle').value);
             saveDraft();
-        } catch (e) { if(e.name !== 'AbortError') alert("Gagal merancang."); }
-        finally { hidePopup(); }
-    };
+        } catch (e) { 
+            if(e.name !== 'AbortError') alert("Gagal merancang alur."); 
+        } finally { hidePopup(); }
+    }
 
+    // --- TOMBOL TULIS BAB ---
     window.writeChapter = async (i) => {
         showPopup(`Menulis Bab ${i+1}...`);
         const titles = document.querySelectorAll('.ch-title-input');
-        const labels = document.querySelectorAll('.ch-label');
         const summaries = document.querySelectorAll('.ch-summary-input');
         
-        // KONTEKS MEMORI
         let pastContext = "";
         for(let j=0; j<i; j++) { pastContext += `Bab ${j+1}: ${summaries[j].value}\n`; }
 
-        // PROMPT ANTI-HALUSINASI BAB LAIN
-        const prompt = `Anda adalah penulis profesional. Tugas Anda: Tulis naskah UNTUK SATU BAB SAJA.
-        
-        TARGET BAB: ${labels[i].innerText} dengan Judul "${titles[i].value}".
-        ALUR BAB INI: ${summaries[i].value}.
-        
+        const prompt = `Tulis naskah UNTUK SATU BAB SAJA.
+        TARGET: Bab ${i+1} Judul "${titles[i].value}".
+        ALUR: ${summaries[i].value}.
         KONTEKS SEBELUMNYA: ${pastContext || "Awal cerita."}
         GENRE: ${getEl('genre').value}. GAYA: ${getEl('style').value}.
         
-        PERATURAN KETAT:
-        1. JANGAN menuliskan kata "Bab ${i+2}" atau bab-bab selanjutnya. Berhentilah saat isi bab ini selesai.
-        2. Tulis murni narasi dan dialog minimal 1500 kata.
-        3. Gunakan tanda baca (koma, titik) dan spasi secara sempurna.
-        4. JANGAN memberi salam atau penjelasan. Langsung mulai cerita.`;
+        WAJIB: Tulis minimal 1500 kata. Pakai koma, titik, spasi dengan benar. JANGAN tulis bab selanjutnya.`;
 
         try {
             const res = await callAI(prompt);
@@ -159,14 +167,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                     <button onclick="writeChapter(${i})" class="h-fit bg-white text-black px-6 py-2 rounded-full text-[10px] font-black">TULIS</button>
                 </div>
-                <textarea class="ch-content-input content-box mt-4" rows="15" placeholder="Narasi..." oninput="saveDraft()">${item.content || ""}</textarea>
+                <textarea class="ch-content-input content-box mt-4" rows="15" oninput="saveDraft()">${item.content || ""}</textarea>
                 <div class="flex justify-end gap-2 mt-2">
-                    <button onclick="downloadSingle(${i}, 'txt')" class="text-[9px] bg-gray-800 px-3 py-1 rounded text-gray-400">UNDUH .TXT</button>
-                    <button onclick="downloadSingle(${i}, 'html')" class="text-[9px] border border-gray-800 px-3 py-1 rounded text-gray-400">UNDUH .HTML</button>
+                    <button onclick="downloadSingle(${i}, 'txt')" class="text-[9px] bg-gray-800 px-3 py-1 rounded text-gray-400">TXT</button>
+                    <button onclick="downloadSingle(${i}, 'html')" class="text-[9px] border border-gray-800 px-3 py-1 rounded text-gray-400">HTML</button>
                 </div>
             </div>
         `).join('');
     }
+
+    // --- PENGIKAT TOMBOL (EVENT LISTENERS) ---
+    getEl('btnCheck').onclick = checkAndSaveApi;
+    getEl('btnPlan').onclick = planNovelAction;
 
     window.downloadSingle = (i, format) => {
         const title = getEl('novelTitle').value || 'Novel';
@@ -194,8 +206,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.clearAllData = () => { if(confirm("Hapus draf?")) { localStorage.removeItem('tebe_v15_final'); location.reload(); } };
 
-    // --- INIT ---
-    getEl('btnCheck').onclick = checkAndSaveApi;
+    // --- INITIALIZE ---
     const savedKey = localStorage.getItem('tebe_key_v15');
     if (savedKey) { getEl('apiKey').value = savedKey; checkAndSaveApi(); }
     loadDraft();
