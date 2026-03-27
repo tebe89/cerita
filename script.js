@@ -1,10 +1,9 @@
-// MEMASTIKAN SCRIPT BERJALAN SETELAH HTML DIMUAT
 document.addEventListener('DOMContentLoaded', () => {
     const getEl = id => document.getElementById(id);
     let timerInterval;
     let abortController;
 
-    // --- POPUP LOGIC ---
+    // --- POPUP ---
     function showPopup(msg) {
         let seconds = 0;
         getEl('popupTimer').innerText = "0s";
@@ -13,7 +12,6 @@ document.addEventListener('DOMContentLoaded', () => {
             seconds++;
             getEl('popupTimer').innerText = seconds + "s";
         }, 1000);
-
         getEl('aiPopup').classList.remove('hidden');
         getEl('popupStatus').innerText = msg;
         getEl('engineStatus').innerText = "Engine: Normal...";
@@ -68,8 +66,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- API CORE ---
     async function checkAndSaveApi() {
         const key = getEl('apiKey').value.trim();
-        if(!key) return alert("Masukan API Key!");
-        showPopup("Menghubungkan Engine...");
+        if(!key) return;
         try {
             const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
             const data = await res.json();
@@ -81,12 +78,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 getEl('engineWrapper').classList.remove('hidden');
                 getEl('btnCheck').innerText = "ENGINE READY ✓";
                 getEl('btnCheck').style.backgroundColor = "#064e3b";
-            } else { throw new Error(); }
-        } catch (e) {
-            getEl('engineStatus').innerText = "Engine: Gangguan!";
-            getEl('engineStatus').className = "text-red-500 text-[10px] font-bold";
-            alert("API Key Salah atau Error Jaringan.");
-        } finally { setTimeout(hidePopup, 800); }
+            }
+        } catch (e) { console.error("Koneksi gagal."); }
     }
 
     async function callAI(prompt) {
@@ -97,39 +90,58 @@ document.addEventListener('DOMContentLoaded', () => {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             signal: abortController.signal,
-            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.8 } })
+            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.85, maxOutputTokens: 8192 } })
         });
         const data = await res.json();
-        if (!data.candidates) throw new Error("AI Sibuk.");
+        if (!data.candidates) throw new Error("Gagal.");
         let text = data.candidates[0].content.parts[0].text;
-        // PEMBERSIH: Hanya buang salam pembuka, jaga koma & spasi.
+        // Bersihkan sapaan AI
         return text.replace(/^.*?(Berikut|Tentu|Halo|Baiklah).*?(\n|:)/gi, '').trim();
     }
 
-    async function planNovel() {
+    window.planNovel = async () => {
         const idea = getEl('storyIdea').value;
         if(!idea) return alert("Isi Ide!");
         showPopup("Merancang Alur...");
         try {
-            const raw = await callAI(`Buat alur novel JSON: [{"label":"Bab 1","judul":"...","ringkasan":"..."}]. Ide: ${idea}`);
+            const raw = await callAI(`Bertindaklah sebagai arsitek alur. Buat alur novel dalam format JSON murni: [{"label":"Bab 1","judul":"...","ringkasan":"..."}]. Pastikan alur logis. Ide: ${idea}`);
             const jsonPart = raw.substring(raw.indexOf('['), raw.lastIndexOf(']') + 1);
             renderWorkspace(JSON.parse(jsonPart), getEl('novelTitle').value);
             saveDraft();
-        } catch (e) { if(e.name !== 'AbortError') alert("Gagal Merancang."); }
+        } catch (e) { if(e.name !== 'AbortError') alert("Gagal merancang."); }
         finally { hidePopup(); }
-    }
+    };
 
-    window.writeChapter = async function(i) {
+    window.writeChapter = async (i) => {
         showPopup(`Menulis Bab ${i+1}...`);
         const titles = document.querySelectorAll('.ch-title-input');
+        const labels = document.querySelectorAll('.ch-label');
         const summaries = document.querySelectorAll('.ch-summary-input');
-        const prompt = `Tulis cerita novel: ${titles[i].value}. Alur: ${summaries[i].value}. 
-        PENTING: Gunakan tanda baca koma (,) dan titik (.) dengan benar. Gunakan spasi antar kata. Minimal 1500 kata.`;
+        
+        // KONTEKS MEMORI
+        let pastContext = "";
+        for(let j=0; j<i; j++) { pastContext += `Bab ${j+1}: ${summaries[j].value}\n`; }
+
+        // PROMPT ANTI-HALUSINASI BAB LAIN
+        const prompt = `Anda adalah penulis profesional. Tugas Anda: Tulis naskah UNTUK SATU BAB SAJA.
+        
+        TARGET BAB: ${labels[i].innerText} dengan Judul "${titles[i].value}".
+        ALUR BAB INI: ${summaries[i].value}.
+        
+        KONTEKS SEBELUMNYA: ${pastContext || "Awal cerita."}
+        GENRE: ${getEl('genre').value}. GAYA: ${getEl('style').value}.
+        
+        PERATURAN KETAT:
+        1. JANGAN menuliskan kata "Bab ${i+2}" atau bab-bab selanjutnya. Berhentilah saat isi bab ini selesai.
+        2. Tulis murni narasi dan dialog minimal 1500 kata.
+        3. Gunakan tanda baca (koma, titik) dan spasi secara sempurna.
+        4. JANGAN memberi salam atau penjelasan. Langsung mulai cerita.`;
+
         try {
             const res = await callAI(prompt);
             document.querySelectorAll('.ch-content-input')[i].value = res;
             saveDraft();
-        } catch (e) { if(e.name !== 'AbortError') alert("Gagal Menulis."); }
+        } catch (e) { if(e.name !== 'AbortError') alert("Gagal menulis."); }
         finally { hidePopup(); }
     };
 
@@ -138,23 +150,34 @@ document.addEventListener('DOMContentLoaded', () => {
         getEl('displayTitle').innerText = title || "Karya Tebe";
         getEl('novelWorkspace').classList.remove('hidden');
         getEl('chaptersArea').innerHTML = plan.map((item, i) => `
-            <div class="chapter-card bg-[#111] p-6 rounded-2xl border border-gray-900 space-y-4 mb-8">
+            <div class="chapter-card bg-[#111] p-6 rounded-2xl border border-gray-900 mb-8">
                 <div class="flex justify-between border-b border-gray-800 pb-4">
                     <div class="flex-1">
                         <span class="ch-label text-[9px] gold-text font-bold uppercase">${item.label}</span>
                         <input type="text" class="ch-title-input w-full text-lg font-bold bg-transparent outline-none novel-font text-white" value="${item.judul}" oninput="saveDraft()">
                         <textarea class="ch-summary-input summary-box mt-2" rows="3" oninput="saveDraft()">${item.ringkasan}</textarea>
                     </div>
-                    <button onclick="writeChapter(${i})" class="h-fit bg-white text-black px-6 py-2 rounded-full text-[10px] font-black hover:bg-yellow-500">TULIS</button>
+                    <button onclick="writeChapter(${i})" class="h-fit bg-white text-black px-6 py-2 rounded-full text-[10px] font-black">TULIS</button>
                 </div>
-                <textarea class="ch-content-input content-box" rows="15" oninput="saveDraft()">${item.content || ""}</textarea>
+                <textarea class="ch-content-input content-box mt-4" rows="15" placeholder="Narasi..." oninput="saveDraft()">${item.content || ""}</textarea>
+                <div class="flex justify-end gap-2 mt-2">
+                    <button onclick="downloadSingle(${i}, 'txt')" class="text-[9px] bg-gray-800 px-3 py-1 rounded text-gray-400">UNDUH .TXT</button>
+                    <button onclick="downloadSingle(${i}, 'html')" class="text-[9px] border border-gray-800 px-3 py-1 rounded text-gray-400">UNDUH .HTML</button>
+                </div>
             </div>
         `).join('');
     }
 
-    // --- EVENT BINDING ---
-    getEl('btnCheck').onclick = checkAndSaveApi;
-    getEl('btnPlan').onclick = planNovel;
+    window.downloadSingle = (i, format) => {
+        const title = getEl('novelTitle').value || 'Novel';
+        const card = document.querySelectorAll('.chapter-card')[i];
+        const t = card.querySelector('.ch-title-input').value;
+        const c = card.querySelector('.ch-content-input').value;
+        let res = format === 'html' ? `<html><body style="background:#917e5d; font-family:serif; padding:40px; line-height:1.6; text-align:justify;"><h2>${t}</h2><p>${c.replace(/\n/g, '</p><p>')}</p></body></html>` : `[ ${t} ]\n\n${c}`;
+        const blob = new Blob([res], { type: format === 'html' ? 'text/html' : 'text/plain' });
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+        a.download = `${title}_${t}.${format}`; a.click();
+    };
 
     window.downloadFull = (format) => {
         const title = getEl('novelTitle').value || 'Novel';
@@ -169,9 +192,10 @@ document.addEventListener('DOMContentLoaded', () => {
         a.download = `${title}_Full.${format}`; a.click();
     };
 
-    window.clearAllData = () => { if(confirm("Hapus?")) { localStorage.removeItem('tebe_v15_final'); location.reload(); } };
+    window.clearAllData = () => { if(confirm("Hapus draf?")) { localStorage.removeItem('tebe_v15_final'); location.reload(); } };
 
-    // --- ON LOAD ---
+    // --- INIT ---
+    getEl('btnCheck').onclick = checkAndSaveApi;
     const savedKey = localStorage.getItem('tebe_key_v15');
     if (savedKey) { getEl('apiKey').value = savedKey; checkAndSaveApi(); }
     loadDraft();
