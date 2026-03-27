@@ -1,72 +1,79 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-  <title>Tebe Story Maker v15 | Novel Studio</title>
-  <!-- Tailwind CSS + Fonts + Icons -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700;800&family=Crimson+Pro:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-  <!-- Custom CSS -->
-  <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TEBE STORY MAKER v15 - Repair Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="style.css">
 </head>
-<body class="bg-[#0d0d0d] text-gray-200 font-crimson">
+<body class="flex flex-col md:flex-row min-h-screen">
 
-<div class="flex h-screen w-full overflow-hidden">
-  <!-- SIDEBAR KIRI (320px fixed, scroll independen) -->
-  <aside class="w-[320px] flex-shrink-0 sidebar flex flex-col overflow-y-auto p-5 gap-5">
-    <!-- Judul Aplikasi -->
-    <div class="border-b border-[#c5a059]/30 pb-3">
-      <h1 class="text-2xl font-cinzel font-bold text-[#c5a059] tracking-wide">TEBE STORY MAKER</h1>
-      <p class="text-xs text-gray-400 mt-1">v15 · professional novel studio</p>
+    <div id="aiPopup" class="hidden fixed inset-0 bg-black/95 z-[999] flex items-center justify-center">
+        <div class="bg-[#111] border-2 border-[#c5a059] p-8 rounded-[2rem] text-center max-w-xs w-full shadow-2xl">
+            <div class="loader mb-4 mx-auto"></div>
+            <h3 class="gold-text font-bold text-lg novel-font" id="popupStatus">AI Sedang Menulis...</h3>
+            <p class="text-gray-500 text-[10px] mt-2 italic">"Sedang menyusun tata bahasa & tanda baca yang rapi."</p>
+        </div>
     </div>
 
-    <!-- API Key + Model -->
-    <div class="space-y-3">
-      <label class="block text-xs uppercase tracking-wider text-gray-400 font-semibold">🔑 Gemini API Key</label>
-      <input type="password" id="apiKeyInput" placeholder="Masukkan API Key" class="w-full p-2 rounded text-sm">
-      <button id="connectModelsBtn" class="w-full btn-outline-gold rounded py-2 text-sm font-medium"><i class="fas fa-plug mr-1"></i> Connect & Ambil Model</button>
-      
-      <label class="block text-xs uppercase tracking-wider text-gray-400 font-semibold mt-2">🤖 Model AI</label>
-      <select id="modelSelect" class="w-full p-2 rounded text-sm bg-[#1a1a1a]">
-        <option value="">-- Belum terhubung --</option>
-      </select>
+    <div class="sidebar">
+        <div class="space-y-6">
+            <h1 class="text-xl font-bold gold-text border-b border-gray-800 pb-2">Studio Novel v15</h1>
+            
+            <div class="space-y-3">
+                <span class="text-[10px] font-black text-gray-500 uppercase flex justify-between tracking-tighter">🔑 API KEY <span id="savedTag" class="hidden text-green-600 font-bold uppercase">Saved</span></span>
+                <input type="password" id="apiKey" placeholder="Gemini API Key..." class="w-full p-2 input-dark border-yellow-900/20">
+                <button type="button" onclick="checkAndSaveApi()" id="btnCheck" class="w-full py-2 gold-bg text-xs font-bold rounded">HUBUNGKAN ENGINE</button>
+                <div id="engineWrapper" class="hidden">
+                    <select id="modelSelect" class="w-full p-2 input-dark text-yellow-500 font-bold"></select>
+                </div>
+            </div>
+
+            <div class="space-y-2">
+                <span class="text-[10px] font-black text-gray-500 uppercase">1. Konsep Mahakarya</span>
+                <input type="text" id="novelTitle" placeholder="Judul Novel" class="w-full p-2 input-dark" oninput="saveDraft()">
+                <div class="grid grid-cols-2 gap-2">
+                    <input type="text" id="genre" placeholder="Genre" class="p-2 input-dark" oninput="saveDraft()">
+                    <input type="text" id="style" placeholder="Gaya Bahasa" class="p-2 input-dark" oninput="saveDraft()">
+                </div>
+                <textarea id="storyIdea" rows="3" placeholder="Ide Utama..." class="w-full p-2 input-dark" oninput="saveDraft()"></textarea>
+            </div>
+
+            <div class="space-y-2">
+                <span class="text-[10px] font-black text-gray-500 uppercase">2. Struktur</span>
+                <input type="number" id="chapterCount" value="3" class="w-full p-2 input-dark text-center gold-text font-bold outline-none">
+                <button type="button" onclick="planNovel()" id="btnPlan" class="w-full py-3 bg-blue-900 text-white text-[10px] font-bold rounded-lg border border-blue-500 shadow-xl">RANCANG ALUR</button>
+            </div>
+
+            <div class="space-y-3 pt-4 border-t border-gray-800">
+                <span class="text-[10px] font-black text-gray-500 uppercase text-center block">Ekspor Seluruh Novel</span>
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="downloadFull('txt')" class="py-2 bg-gray-800 text-[10px] font-bold rounded border border-gray-700 hover:text-white">FULL .TXT</button>
+                    <button onclick="downloadFull('html')" class="py-2 border border-[#c5a059] gold-text text-[10px] font-bold rounded hover:bg-[#c5a059]/10">FULL .HTML</button>
+                </div>
+                <button onclick="clearAllData()" class="w-full py-1 text-[8px] text-red-900 uppercase font-bold tracking-widest mt-2">Hapus Draf</button>
+            </div>
+            <div class="sidebar-footer-spacer"></div>
+        </div>
     </div>
 
-    <!-- Konsep Novel -->
-    <div class="space-y-3 border-t border-gray-800 pt-4">
-      <h3 class="font-cinzel text-[#c5a059] font-semibold">📖 KONSEP NOVEL</h3>
-      <input type="text" id="novelTitle" placeholder="Judul Novel" class="w-full p-2 rounded text-sm">
-      <input type="text" id="novelGenre" placeholder="Genre (ex: Dark Fantasy, Thriller)" class="w-full p-2 rounded text-sm">
-      <input type="text" id="novelStyle" placeholder="Gaya Penulisan (ex: Gothic, Cinematic)" class="w-full p-2 rounded text-sm">
-      <textarea id="novelIdea" rows="3" placeholder="Ide cerita utama, sinopsis, atau premise..." class="w-full p-2 rounded text-sm resize-none"></textarea>
+    <div class="main-content p-6 md:p-10">
+        <div id="mainPlaceholder" class="h-full flex flex-col items-center justify-center text-center">
+            <div class="p-10 border border-gray-900 rounded-[2.5rem] max-w-lg w-full bg-[#111]/30">
+                <h2 class="text-4xl font-bold gold-text mb-4 novel-font">The Ghostwriter</h2>
+                <p class="text-gray-400 text-sm novel-font italic">"Perbaikan Tanda Baca & Spasi Aktif."</p>
+            </div>
+        </div>
+        <div id="novelWorkspace" class="hidden space-y-10 max-w-4xl mx-auto">
+            <div class="text-center border-b border-gray-800 pb-8">
+                <h2 id="displayTitle" class="text-5xl font-bold gold-text novel-font"></h2>
+                <p id="displayMeta" class="text-[10px] text-gray-600 tracking-[0.4em] uppercase mt-2"></p>
+            </div>
+            <div id="chaptersArea" class="space-y-12 pb-20"></div>
+        </div>
     </div>
 
-    <!-- Tombol Aksi Utama & Ekspor Full -->
-    <div class="space-y-2 pt-2">
-      <button id="newChapterBtn" class="w-full btn-gold rounded py-2.5 font-bold text-sm shadow-lg"><i class="fas fa-feather-alt mr-2"></i> + TULIS BAB BARU</button>
-      <div class="grid grid-cols-2 gap-2">
-        <button id="exportFullTxtBtn" class="btn-outline-gold rounded py-2 text-sm"><i class="fas fa-file-alt"></i> TXT Full</button>
-        <button id="exportFullHtmlBtn" class="btn-outline-gold rounded py-2 text-sm"><i class="fab fa-html5"></i> HTML Full</button>
-      </div>
-      <div class="text-[10px] text-gray-500 text-center mt-1">Auto-save aktif ✨</div>
-    </div>
-  </aside>
-
-  <!-- WORKSPACE KANAN: daftar bab (chapter cards) -->
-  <main class="flex-1 overflow-y-auto p-6 bg-[#0d0d0d]">
-    <div class="flex justify-between items-center mb-5 flex-wrap gap-2">
-      <h2 class="text-2xl font-cinzel text-[#c5a059]"><i class="fas fa-book-open mr-2"></i>Bab-bab Novel</h2>
-      <span id="chapterCountBadge" class="bg-[#1e1e1e] text-[#c5a059] px-3 py-1 rounded-full text-sm">0 bab</span>
-    </div>
-    <div id="chaptersContainer" class="space-y-6">
-      <!-- dynamic chapter cards akan di-render di sini -->
-      <div class="text-center text-gray-500 py-20 italic">Belum ada bab. Klik "TULIS BAB BARU" untuk memulai masterpiece Anda.</div>
-    </div>
-  </main>
-</div>
-
-<script src="script.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>
