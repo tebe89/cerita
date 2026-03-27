@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TEBE STORY MAKER v15 - Final Fix</title>
+    <title>TEBE STORY MAKER v15 - Stable Fix</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="style.css">
 </head>
@@ -22,6 +22,7 @@
     <div class="sidebar">
         <div class="space-y-6">
             <h1 class="text-xl font-bold gold-text border-b border-gray-800 pb-2">Studio Novel v15</h1>
+            
             <div class="space-y-3">
                 <span class="text-[10px] font-black text-gray-500 uppercase flex justify-between">🔑 API KEY <span id="savedTag" class="hidden text-green-600 font-bold uppercase">Saved</span></span>
                 <input type="password" id="apiKey" placeholder="Gemini API Key..." class="w-full p-2 input-dark border-yellow-900/20">
@@ -30,6 +31,7 @@
                     <select id="modelSelect" class="w-full p-2 input-dark text-yellow-500 font-bold border-yellow-900/30"></select>
                 </div>
             </div>
+
             <div class="space-y-2">
                 <span class="text-[10px] font-black text-gray-500 uppercase">1. Konsep</span>
                 <input type="text" id="novelTitle" placeholder="Judul Novel" class="w-full p-2 input-dark">
@@ -39,15 +41,17 @@
                 </div>
                 <textarea id="storyIdea" rows="3" placeholder="Ide Utama..." class="w-full p-2 input-dark"></textarea>
             </div>
+
             <div class="space-y-2">
                 <span class="text-[10px] font-black text-gray-500 uppercase">2. Struktur</span>
                 <input type="number" id="chapterCount" value="3" class="w-full p-2 input-dark text-center gold-text font-bold">
                 <button type="button" id="btnPlan" class="w-full py-3 bg-blue-900 text-white text-[10px] font-bold rounded-lg border border-blue-500 shadow-xl">RANCANG ALUR</button>
             </div>
+
             <div class="space-y-3 pt-4 border-t border-gray-800">
                 <div class="grid grid-cols-2 gap-2">
-                    <button onclick="downloadFull('txt')" class="py-2 bg-gray-800 text-[10px] font-bold rounded border border-gray-700 hover:text-white">FULL .TXT</button>
-                    <button onclick="downloadFull('html')" class="py-2 border border-[#c5a059] gold-text text-[10px] font-bold rounded hover:bg-[#c5a059]/10">FULL .HTML</button>
+                    <button onclick="downloadFull('txt')" class="py-2 bg-gray-800 text-[10px] font-bold rounded border border-gray-700">FULL .TXT</button>
+                    <button onclick="downloadFull('html')" class="py-2 border border-[#c5a059] gold-text text-[10px] font-bold rounded">FULL .HTML</button>
                 </div>
                 <button onclick="clearAllData()" class="w-full py-1 text-[8px] text-red-900 uppercase font-bold tracking-widest mt-2">Hapus Draf</button>
             </div>
@@ -59,7 +63,7 @@
         <div id="mainPlaceholder" class="h-full flex flex-col items-center justify-center text-center">
             <div class="p-10 border border-gray-900 rounded-[2.5rem] max-w-lg w-full bg-[#111]/30">
                 <h2 class="text-4xl font-bold gold-text mb-4 novel-font">The Ghostwriter</h2>
-                <p class="text-gray-400 text-sm italic">"Mode Stabil v15: Klik Hubungkan Engine untuk memulai."</p>
+                <p class="text-gray-400 text-sm italic">"Struktur Berantai Diperbaiki. Fokus Bab Tunggal Aktif."</p>
             </div>
         </div>
         <div id="novelWorkspace" class="hidden space-y-10 max-w-4xl mx-auto">
