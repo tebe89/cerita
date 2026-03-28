@@ -52,7 +52,7 @@ window.loadDraft = () => {
     getEl('storyIdea').value = data.idea || "";
     getEl('chapterCount').value = data.chapterCount || 3;
     
-    if (data.apiKey) window.checkAndSaveApi(true); // Auto-connect
+    if (data.apiKey) window.checkAndSaveApi(true); 
     if (data.workspaceVisible) window.renderWorkspace(data.chapters, data.title);
 };
 
@@ -69,7 +69,6 @@ window.checkAndSaveApi = async (isSilent = false) => {
             const models = data.models.filter(m => m.supportedGenerationMethods.includes('generateContent'));
             getEl('modelSelect').innerHTML = models.map(m => `<option value="${m.name}">${m.displayName.replace("Gemini ","")}</option>`).join('');
             
-            // Restore model selection if exists
             const savedData = JSON.parse(localStorage.getItem('tebe_v15_final_ultra'));
             if(savedData && savedData.model) getEl('modelSelect').value = savedData.model;
             
@@ -90,10 +89,13 @@ async function callAI(prompt) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         signal: abortController.signal,
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.8, maxOutputTokens: 8192 } })
+        body: JSON.stringify({ 
+            contents: [{ parts: [{ text: prompt }] }], 
+            generationConfig: { temperature: 0.8, maxOutputTokens: 8192 } 
+        })
     });
     const data = await res.json();
-    if (!data.candidates) throw new Error("AI Sibuk.");
+    if (!data.candidates) throw new Error("AI Sibuk atau API Key salah.");
     let text = data.candidates[0].content.parts[0].text;
     return text.replace(/^.*?(Berikut|Tentu|Halo|Baiklah).*?(\n|:)/gi, '').trim();
 }
@@ -104,7 +106,9 @@ window.planNovel = async () => {
     window.showPopup("Merancang Alur...");
     try {
         const count = getEl('chapterCount').value || 3;
-        const prompt = `Bertindak sebagai arsitek alur. Buat alur novel dalam format JSON murni: [{"label":"Prolog","judul":"...","ringkasan":"..."},{"label":"Bab 1","judul":"...","ringkasan":"..."},{"label":"Epilog","judul":"...","ringkasan":"..."}]. Pastikan mencakup Prolog, ${count} Bab tengah, dan Epilog. Ide: ${idea}`;
+        const prompt = `Bertindak sebagai arsitek alur novel. Judul: ${getEl('novelTitle').value}. Ide: ${idea}. 
+        Buat alur JSON murni: [{"label":"Prolog","judul":"...","ringkasan":"..."},{"label":"Bab 1","judul":"...","ringkasan":"..."},{"label":"Epilog","judul":"...","ringkasan":"..."}]. 
+        Pastikan urutan logis. Tambahkan Bab sesuai jumlah target (${count}).`;
         const raw = await callAI(prompt);
         const jsonPart = raw.substring(raw.indexOf('['), raw.lastIndexOf(']') + 1);
         window.renderWorkspace(JSON.parse(jsonPart), getEl('novelTitle').value);
@@ -113,17 +117,49 @@ window.planNovel = async () => {
     finally { window.hidePopup(); }
 };
 
+// --- PERBAIKAN UTAMA: SISTEM PENULISAN BERANTAI & ANTI-KACAU BAB ---
 window.writeChapter = async (i) => {
-    window.showPopup(`Menulis ${document.querySelectorAll('.ch-label')[i].innerText}...`);
+    const labels = document.querySelectorAll('.ch-label');
     const titles = document.querySelectorAll('.ch-title-input');
     const summaries = document.querySelectorAll('.ch-summary-input');
-    const prompt = `Tulis naskah novel: ${titles[i].value}. Alur: ${summaries[i].value}. 
-    PENTING: Gunakan tanda baca koma (,) dan titik (.) dengan benar. Spasi rapi. Minimal 1500 kata.`;
+    
+    window.showPopup(`Menulis ${labels[i].innerText}...`);
+
+    // Mengumpulkan konteks cerita sebelumnya agar terhubung
+    let storyContext = "";
+    if (i > 0) {
+        storyContext = "KONTEKS CERITA SEBELUMNYA (Untuk menjaga kesinambungan):\n";
+        for (let j = 0; j < i; j++) {
+            storyContext += `- ${labels[j].innerText}: ${summaries[j].value}\n`;
+        }
+    }
+
+    const prompt = `Anda adalah penulis novel profesional. 
+    Tugas: Tulis narasi lengkap untuk bagian ini saja.
+    
+    IDENTITAS BAGIAN:
+    Label: ${labels[i].innerText}
+    Judul: ${titles[i].value}
+    
+    ${storyContext}
+    
+    ALUR YANG HARUS DITULIS SEKARANG:
+    ${summaries[i].value}
+    
+    GAYA BAHASA: ${getEl('style').value}
+    GENRE: ${getEl('genre').value}
+    
+    PERATURAN KETAT:
+    1. JANGAN menuliskan label seperti "Bab 1" atau "Prolog" di awal teks jika label aslinya adalah ${labels[i].innerText}. Ikuti label yang diberikan!
+    2. JANGAN menulis ringkasan, langsung mulai cerita.
+    3. Minimal 1500 kata. Gunakan tanda baca koma, titik, dan spasi dengan benar.
+    4. Pastikan alur terasa menyambung dengan konteks sebelumnya.`;
+
     try {
         const res = await callAI(prompt);
         document.querySelectorAll('.ch-content-input')[i].value = res;
         window.saveDraft();
-    } catch (e) { if(e.name !== 'AbortError') alert("Gagal."); }
+    } catch (e) { if(e.name !== 'AbortError') alert("Gagal menulis bab."); }
     finally { window.hidePopup(); }
 };
 
@@ -141,7 +177,7 @@ window.renderWorkspace = (plan, title) => {
                 </div>
                 <button onclick="writeChapter(${i})" class="h-fit bg-white text-black px-6 py-2 rounded-full text-[10px] font-black hover:bg-yellow-500">TULIS</button>
             </div>
-            <textarea class="ch-content-input content-box mt-4" rows="15" oninput="window.saveDraft()">${item.content || ""}</textarea>
+            <textarea class="ch-content-input content-box mt-4" rows="15" oninput="window.saveDraft()" placeholder="Hasil tulisan akan muncul di sini...">${item.content || ""}</textarea>
             <div class="flex justify-end gap-2 mt-2">
                 <button onclick="window.downloadSingle(${i}, 'txt')" class="text-[9px] bg-gray-800 px-3 py-1 rounded text-gray-400">TXT</button>
                 <button onclick="window.downloadSingle(${i}, 'html')" class="text-[9px] border border-gray-800 px-3 py-1 rounded text-gray-400">HTML</button>
@@ -150,26 +186,15 @@ window.renderWorkspace = (plan, title) => {
     `).join('');
 };
 
-// --- DOWNLOAD (PORTRAIT FIXED) ---
-const htmlHeader = (title) => `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>
-    @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;700&family=Cinzel:wght@700&display=swap');
-    body { background:#f4ece0; color:#2c2c2c; font-family:'Crimson Pro',serif; line-height:1.7; margin:0; padding:0; text-align:justify; }
-    .page { max-width: 95%; margin: 10px auto; background: white; padding: 20px; box-shadow: 0 0 10px rgba(0,0,0,0.05); border-radius: 5px; }
-    @media (min-width: 768px) { .page { max-width: 800px; padding: 60px 80px; margin: 40px auto; } }
-    h1 { font-family:'Cinzel',serif; text-align:center; color:#8b6b23; font-size: 2.5rem; margin: 40px 0; }
-    h2 { font-family:'Cinzel',serif; text-align:center; color:#8b6b23; font-size: 1.8rem; margin: 40px 0 20px 0; border-bottom: 1px solid #eee; padding-bottom: 10px; }
-    p { margin-bottom: 1.2rem; text-indent: 2rem; font-size: 1.2rem; }
-    .cover { height: 90vh; display: flex; flex-direction: column; justify-content: center; align-items: center; border: 8px double #8b6b23; margin: 10px; background:white;}
-</style></head><body>`;
-
 window.downloadSingle = (i, format) => {
     const card = document.querySelectorAll('.chapter-card')[i];
     const t = card.querySelector('.ch-title-input').value;
+    const l = card.querySelector('.ch-label').innerText;
     const c = card.querySelector('.ch-content-input').value;
     let res = (format === 'html') ? 
-        `${htmlHeader(t)}<div class="page"><h2>${t}</h2>${c.split('\n').filter(p=>p.trim()!="").map(p=>`<p>${p.trim()}</p>`).join('')}</div></body></html>` : 
-        `[ ${t} ]\n\n${c}`;
-    saveFile(res, `${t}.${format}`, format);
+        `${htmlHeader(t)}<div class="page"><h2>${l}: ${t}</h2>${c.split('\n').filter(p=>p.trim()!="").map(p=>`<p>${p.trim()}</p>`).join('')}</div></body></html>` : 
+        `[ ${l} - ${t} ]\n\n${c}`;
+    saveFile(res, `${l}_${t}.${format}`, format);
 };
 
 window.downloadFull = (format) => {
@@ -178,14 +203,18 @@ window.downloadFull = (format) => {
     if (format === 'html') {
         res = `${htmlHeader(title)}<div class="cover"><h1>${title}</h1><p>Karya Sastra Terpilih</p></div>`;
         document.querySelectorAll('.chapter-card').forEach(card => {
+            const l = card.querySelector('.ch-label').innerText;
             const t = card.querySelector('.ch-title-input').value;
             const c = card.querySelector('.ch-content-input').value;
-            res += `<div class="page"><h2>${t}</h2>${c.split('\n').filter(p=>p.trim()!="").map(p=>`<p>${p.trim()}</p>`).join('')}</div>`;
+            res += `<div class="page"><h2>${l}: ${t}</h2>${c.split('\n').filter(p=>p.trim()!="").map(p=>`<p>${p.trim()}</p>`).join('')}</div>`;
         });
         res += "</body></html>";
     } else {
         document.querySelectorAll('.chapter-card').forEach(card => {
-            res += `\n\n--- ${card.querySelector('.ch-title-input').value.toUpperCase()} ---\n\n${card.querySelector('.ch-content-input').value}`;
+            const l = card.querySelector('.ch-label').innerText;
+            const t = card.querySelector('.ch-title-input').value;
+            const c = card.querySelector('.ch-content-input').value;
+            res += `\n\n--- ${l.toUpperCase()} : ${t.toUpperCase()} ---\n\n${c}`;
         });
     }
     saveFile(res, `${title}_Lengkap.${format}`, format);
